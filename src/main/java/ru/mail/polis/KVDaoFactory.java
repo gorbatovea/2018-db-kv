@@ -34,6 +34,7 @@ import java.util.*;
 public final class KVDaoFactory {
     private static final long MAX_HEAP = 128 * 1024 * 1024;
 
+
     private KVDaoFactory() {
         // Not instantiatable
     }
@@ -241,13 +242,13 @@ public final class KVDaoFactory {
                     byte[] bytes = new byte[randomAccessFile.readInt()];
                     randomAccessFile.read(bytes);
                     int offSet = randomAccessFile.readInt();
+                    randomAccessFile.skipBytes(Long.BYTES);
                     if (Arrays.equals(bytes, key)) {
                         if (offSet != REMOVED_MARK) {
                             valueOffset = offSet;
                         } else throw new NoSuchElementException();
                     }
                 }
-
                 randomAccessFile.skipBytes(valueOffset);
                 byte[] value = new byte[randomAccessFile.readInt()];
                 randomAccessFile.read(value);
