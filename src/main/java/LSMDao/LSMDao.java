@@ -285,20 +285,25 @@ public class LSMDao implements KVDao {
                     + (Integer.BYTES + Integer.BYTES + Integer.BYTES) * source.size()
                     + bytes;
 
-            ByteBuffer buffer = ByteBuffer.allocate(size);
-            buffer.putLong(System.currentTimeMillis())
+            ByteBuffer buffer = ByteBuffer.allocate(size)
+                    .putLong(System.currentTimeMillis())
                     .putInt(source.size());
+
             for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
                 this.sSMap.put(
                         entry.getKey(),
                         new LSMDao.SnapshotHolder.Value(fileNumber, entry.getValue().getTimeStamp()));
-                buffer.putInt(entry.getKey().capacity());
+
+                buffer.putInt(entry.getKey().capacity())
+                        .put(entry.getKey());
+
                 if (entry.getValue().getValue() == REMOVED_VALUE) {
                     buffer.putInt(REMOVED_MARK);
                 } else {
                     buffer.putInt(offset);
                     offset += Integer.BYTES + entry.getValue().getValue().length;
                 }
+
                 buffer.putLong(entry.getValue().getTimeStamp());
             }
 
