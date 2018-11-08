@@ -283,7 +283,7 @@ public class LSMDao implements KVDao {
 
             int size = Long.BYTES
                     + Integer.BYTES
-                    + (Integer.BYTES + Integer.BYTES + Long.BYTES + Integer.BYTES) * source.size()
+                    + (Integer.BYTES + Integer.BYTES + Integer.BYTES) * source.size()
                     + bytes;
 
             ByteBuffer intBuffer = ByteBuffer.allocate(Integer.BYTES);
