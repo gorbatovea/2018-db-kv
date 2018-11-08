@@ -278,50 +278,38 @@ public class LSMDao implements KVDao {
         public void save(SortedMap<ByteBuffer, LSMDao.Value> source, int bytes) throws IOException {
             int offset = 0;
             File dist = new File(this.storage + File.separator + fileNumber.toString());
-            if (!dist.createNewFile())
-                throw new IOException();
+            if (!dist.createNewFile()) throw new IOException();
 
             int size = Long.BYTES
                     + Integer.BYTES
                     + (Integer.BYTES + Integer.BYTES + Integer.BYTES) * source.size()
                     + bytes;
 
-            ByteBuffer intBuffer = ByteBuffer.allocate(Integer.BYTES);
-            OutputStream outputStream = new FileOutputStream(dist);
-            outputStream.write(ByteBuffer.allocate(Long.BYTES).putLong(System.currentTimeMillis()).array());
-            outputStream.write(intBuffer.putInt(source.size()).array());
-            intBuffer.clear();
-
-            for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
-                outputStream.write(intBuffer.putInt(entry.getKey().array().length).array());
-                intBuffer.clear();
-                outputStream.write(entry.getKey().array());
-                if (entry.getValue().getValue() == REMOVED_VALUE) {
-                    outputStream.write(intBuffer.putInt(REMOVED_MARK).array());
-                    intBuffer.clear();
-                } else {
-                    outputStream.write(intBuffer.putInt(offset).array());
-                    intBuffer.clear();
-                    offset += Integer.BYTES + entry.getValue().getValue().length;
-                }
-                outputStream.write(ByteBuffer.allocate(Long.BYTES).putLong(entry.getValue().getTimeStamp()).array());
-            }
-
-            for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
-                outputStream.write(intBuffer.putInt(entry.getValue().getValue().length).array());
-                intBuffer.clear();
-                outputStream.write(entry.getValue().getValue());
-            }
-
-            outputStream.flush();
-            outputStream.close();
-            System.out.println("Bytes= " + size);
-            System.out.println("File= " + dist.length());
+            ByteBuffer buffer = ByteBuffer.allocate(size);
+            buffer.putLong(System.currentTimeMillis())
+                    .putInt(source.size());
             for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
                 this.sSMap.put(
                         entry.getKey(),
                         new LSMDao.SnapshotHolder.Value(fileNumber, entry.getValue().getTimeStamp()));
+                buffer.putInt(entry.getKey().capacity());
+                if (entry.getValue().getValue() == REMOVED_VALUE) {
+                    buffer.putInt(REMOVED_MARK);
+                } else {
+                    buffer.putInt(offset);
+                    offset += Integer.BYTES + entry.getValue().getValue().length;
+                }
+                buffer.putLong(entry.getValue().getTimeStamp());
             }
+
+            for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
+                buffer.putInt(entry.getValue().getValue().length)
+                        .put(entry.getValue().getValue());
+            }
+            OutputStream outputStream = new FileOutputStream(dist);
+            outputStream.write(buffer.array());
+            outputStream.flush();
+            outputStream.close();
             fileNumber++;
         }
 
