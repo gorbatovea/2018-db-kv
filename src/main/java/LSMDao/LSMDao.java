@@ -14,7 +14,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
 public class LSMDao implements KVDao {
-    final private int MEM_TABLE_TRASH_HOLD = 1024 * 40;
+//    final private int MEM_TABLE_TRASH_HOLD = 1024 * 40;
+    final private int MEM_TABLE_TRASH_HOLD = 1024 * 10;
     final private String STORAGE_DIR;
 
     final private SortedMap<ByteBuffer, Value> memTable = new TreeMap<>();
