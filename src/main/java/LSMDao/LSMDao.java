@@ -21,7 +21,7 @@ public class LSMDao implements KVDao {
 
     final private SnapshotHolder holder;
 
-    private Long memTableSize = 0L;
+    private int memTableSize = 0;
 
     public LSMDao(final File dir) throws IOException {
         this.STORAGE_DIR = dir + File.separator;
@@ -82,9 +82,9 @@ public class LSMDao implements KVDao {
     private void flush() throws IOException{
         synchronized (this.holder) {
             if (memTableSize >= MEM_TABLE_TRASH_HOLD) {
-                this.holder.save(this.memTable);
+                this.holder.save(this.memTable, this.memTableSize);
                 this.memTable.clear();
-                this.memTableSize = 0L;
+                this.memTableSize = 0;
             }
         }
     }
@@ -93,7 +93,7 @@ public class LSMDao implements KVDao {
     public void close() throws IOException {
         synchronized (this) {
             synchronized (this.holder) {
-                this.holder.save(this.memTable);
+                this.holder.save(this.memTable, memTableSize);
                 this.memTable.clear();
                 this.holder.close();
             }
@@ -275,11 +275,16 @@ public class LSMDao implements KVDao {
             return this.sSMap.containsKey(ByteBuffer.wrap(key));
         }
 
-        public void save(SortedMap<ByteBuffer, LSMDao.Value> source) throws IOException {
+        public void save(SortedMap<ByteBuffer, LSMDao.Value> source, int bytes) throws IOException {
             int offset = 0;
             File dist = new File(this.storage + File.separator + fileNumber.toString());
             if (!dist.createNewFile())
                 throw new IOException();
+
+            int size = Long.BYTES
+                    + Integer.BYTES
+                    + (Integer.BYTES + Integer.BYTES + Long.BYTES + Integer.BYTES) * source.size()
+                    + bytes;
 
             ByteBuffer intBuffer = ByteBuffer.allocate(Integer.BYTES);
             OutputStream outputStream = new FileOutputStream(dist);
@@ -307,8 +312,11 @@ public class LSMDao implements KVDao {
                 intBuffer.clear();
                 outputStream.write(entry.getValue().getValue());
             }
+
             outputStream.flush();
             outputStream.close();
+            System.out.println("Bytes= " + size);
+            System.out.println("File= " + dist.length());
             for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
                 this.sSMap.put(
                         entry.getKey(),
