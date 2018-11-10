@@ -161,6 +161,7 @@ public class LSMDao implements KVDao {
                             private void fetchData(@NotNull final Path file) throws IOException {
                                 RandomAccessFile randomAccessFile = new RandomAccessFile(file.toFile(), "r");
                                 long fileMark = randomAccessFile.readLong();
+                                if (fileNumber < fileMark) fileNumber = fileMark;
                                 int amount = randomAccessFile.readInt();
                                 for (int i = 0; i < amount; i++) {
                                     byte[] bytes = new byte[randomAccessFile.readInt()];
@@ -197,10 +198,6 @@ public class LSMDao implements KVDao {
                                             }
                                         }
                                     }
-                                }
-                                if (fileNumber <= Long.parseLong(file.toFile().getName())) {
-                                    fileNumber = Long.parseLong(file.toFile().getName());
-                                    fileNumber++;
                                 }
                                 randomAccessFile.close();
                             }
