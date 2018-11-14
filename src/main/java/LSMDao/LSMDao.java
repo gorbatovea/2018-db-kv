@@ -16,12 +16,9 @@ import java.util.*;
 public class LSMDao implements KVDao {
     private final static String DEFAULT_CONFIG_PATH = "configuration.properties";
     private final static String PROP_LSM_MEMORY_TABLE_SIZE = "lsm.memory.table.size";
-
-    private final int MEM_TABLE_TRASH_HOLD;
-
     private final static int IN_KBITES = 1024;
     private final static int DEFAULT_MEM_TABLE_TRASH_HOLD = 40 * IN_KBITES;
-
+    private final int MEM_TABLE_TRASH_HOLD;
     private final String STORAGE_DIR;
 
     private final Map<ByteBuffer, Value> memTable = new HashMap<>();
@@ -40,7 +37,7 @@ public class LSMDao implements KVDao {
             Properties properties = new Properties();
             properties.load(ClassLoader.getSystemResourceAsStream(DEFAULT_CONFIG_PATH));
             tableSize = Integer.parseInt(properties.getProperty(PROP_LSM_MEMORY_TABLE_SIZE)) * IN_KBITES;
-            if (tableSize  < 1) throw new IllegalArgumentException();
+            if (tableSize < 1) throw new IllegalArgumentException();
         } catch (Exception e) {
             tableSize = DEFAULT_MEM_TABLE_TRASH_HOLD;
         }
