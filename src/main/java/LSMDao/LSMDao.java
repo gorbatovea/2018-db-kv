@@ -35,14 +35,12 @@ public class LSMDao implements KVDao {
         ByteBuffer keyBuffer = ByteBuffer.wrap(key);
         synchronized (this) {
             Optional<Value> value = Optional.ofNullable(this.memTable.get(keyBuffer));
-            if (value.isPresent()) {
-                return value
-                        .filter(v -> v.getBytes() != SnapshotHolder.REMOVED_VALUE)
-                        .orElseThrow(NoSuchElementException::new)
-                        .getBytes();
-            } else {
-                return this.holder.get(keyBuffer);
-            }
+
+            return value.isPresent() ? value
+                    .filter(v -> v.getBytes() != SnapshotHolder.REMOVED_VALUE)
+                    .orElseThrow(NoSuchElementException::new)
+                    .getBytes()
+                    : this.holder.get(keyBuffer);
         }
     }
 
