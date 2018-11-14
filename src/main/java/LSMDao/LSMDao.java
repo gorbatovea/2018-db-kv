@@ -14,19 +14,38 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
 public class LSMDao implements KVDao {
-    final private int MEM_TABLE_TRASH_HOLD = 1024 * 40;
+    private final static String DEFAULT_CONFIG_PATH = "configuration.properties";
+    private final static String PROP_LSM_MEMORY_TABLE_SIZE = "lsm.memory.table.size";
 
-    final private String STORAGE_DIR;
+    private final int MEM_TABLE_TRASH_HOLD;
 
-    final private Map<ByteBuffer, Value> memTable = new HashMap<>();
+    private final static int IN_KBITES = 1024;
+    private final static int DEFAULT_MEM_TABLE_TRASH_HOLD = 40 * IN_KBITES;
 
-    final private SnapshotHolder holder;
+    private final String STORAGE_DIR;
+
+    private final Map<ByteBuffer, Value> memTable = new HashMap<>();
+
+    private final SnapshotHolder holder;
 
     private int memTableSize = 0;
 
     public LSMDao(final File dir) throws IOException {
         this.STORAGE_DIR = dir + File.separator;
         this.holder = new SnapshotHolder(this.STORAGE_DIR);
+
+        int tableSize;
+
+        try {
+            Properties properties = new Properties();
+            properties.load(ClassLoader.getSystemResourceAsStream(DEFAULT_CONFIG_PATH));
+            tableSize = Integer.parseInt(properties.getProperty(PROP_LSM_MEMORY_TABLE_SIZE)) * IN_KBITES;
+            if (tableSize  < 1) throw new IllegalArgumentException();
+        } catch (Exception e) {
+            tableSize = DEFAULT_MEM_TABLE_TRASH_HOLD;
+        }
+
+        this.MEM_TABLE_TRASH_HOLD = tableSize;
     }
 
     @NotNull
@@ -44,6 +63,23 @@ public class LSMDao implements KVDao {
         }
     }
 
+    public LSMDao.Value getWithMeta(@NotNull byte[] key) throws IOException, NoSuchElementException {
+        ByteBuffer keyBuffer = ByteBuffer.wrap(key);
+        Optional<Value> value;
+
+        synchronized (this) {
+            value = Optional.ofNullable(this.memTable.get(keyBuffer));
+        }
+
+        if (value.isPresent()) {
+            return value
+                    .map(v -> v.getBytes() == SnapshotHolder.REMOVED_VALUE ? new Value(null, v.getTimeStamp()) : v)
+                    .get();
+        }
+
+        return this.holder.getWithMeta(keyBuffer);
+    }
+
     @Override
     public void upsert(@NotNull byte[] key, @NotNull byte[] value) throws IOException {
         ByteBuffer keyBuffer = ByteBuffer.wrap(key);
@@ -57,7 +93,7 @@ public class LSMDao implements KVDao {
     }
 
     @Override
-    public void remove(@NotNull byte[] key) throws IOException{
+    public void remove(@NotNull byte[] key) throws IOException {
         ByteBuffer keyBuffer = ByteBuffer.wrap(key);
         synchronized (this) {
             Value wrapper = this.memTable.get(keyBuffer);
@@ -71,7 +107,7 @@ public class LSMDao implements KVDao {
                 byte[] value = wrapper.getBytes();
                 if (value != SnapshotHolder.REMOVED_VALUE) {
                     Value v = new Value(SnapshotHolder.REMOVED_VALUE, System.currentTimeMillis());
-                    this.memTableSize -=  wrapper.getSize();
+                    this.memTableSize -= wrapper.getSize();
                     this.memTableSize += v.getSize();
                     this.memTable.put(keyBuffer, v);
                 }
@@ -80,7 +116,7 @@ public class LSMDao implements KVDao {
         }
     }
 
-    private void flush() throws IOException{
+    private void flush() throws IOException {
         if (memTableSize >= MEM_TABLE_TRASH_HOLD) {
             this.holder.save(this.memTable, this.memTableSize);
             this.memTable.clear();
@@ -94,21 +130,6 @@ public class LSMDao implements KVDao {
             this.holder.save(this.memTable, memTableSize);
             this.memTable.clear();
             this.holder.close();
-        }
-    }
-
-    public LSMDao.Value getWithMeta(@NotNull byte[] key) throws IOException, NoSuchElementException{
-        ByteBuffer keyBuffer = ByteBuffer.wrap(key);
-        Value value;
-        synchronized (this) {
-            value = this.memTable.get(keyBuffer);
-        }
-        if (value == null) {
-            return this.holder.getWithMeta(keyBuffer);
-        } else if (value.getBytes() == SnapshotHolder.REMOVED_VALUE) {
-            return new Value(null, value.getTimeStamp());
-        } else {
-            return new Value(value.getBytes(), value.getTimeStamp());
         }
     }
 
@@ -209,7 +230,7 @@ public class LSMDao implements KVDao {
             }
         }
 
-        public LSMDao.Value getWithMeta(final ByteBuffer key) throws IOException, NoSuchElementException{
+        public LSMDao.Value getWithMeta(final ByteBuffer key) throws IOException, NoSuchElementException {
 
             Value value;
             synchronized (this) {
@@ -289,8 +310,7 @@ public class LSMDao implements KVDao {
 
                 for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
 
-                    buffer
-                            .putInt(entry.getKey().capacity())
+                    buffer.putInt(entry.getKey().capacity())
                             .put(entry.getKey().array());
 
                     if (entry.getValue().getBytes() == REMOVED_VALUE) {
@@ -315,10 +335,9 @@ public class LSMDao implements KVDao {
                 outputStream.close();
 
                 for (Map.Entry<ByteBuffer, LSMDao.Value> entry : source.entrySet()) {
-                    if (entry.getValue().getBytes() != REMOVED_VALUE)
-                    {
+                    if (entry.getValue().getBytes() != REMOVED_VALUE) {
                         this.sSMap.put(
-                                entry.getKey() ,
+                                entry.getKey(),
                                 new Value(fileNumber, entry.getValue().getTimeStamp())
                         );
                     } else {
